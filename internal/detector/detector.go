@@ -20,6 +20,11 @@ var (
 
 	// New format: limit reached ∙ resets Xam/pm
 	newFormatPattern = regexp.MustCompile(`limit reached.*resets (\d{1,2})(am|pm)`)
+
+	// Claude Code input prompt pattern: line of box-drawing chars, then "> " line, then more dashes
+	// The prompt looks like: ────────────────\n> \n────────────────
+	// Note: \xc2\xa0 is non-breaking space which Claude Code uses after >
+	claudeCodePromptPattern = regexp.MustCompile(`─{10,}\n>[\s\xc2\xa0]*\n─{10,}`)
 )
 
 // DetectUsageLimit checks content for usage limit messages and parses the reset time.
@@ -51,6 +56,12 @@ func DetectUsageLimit(content string) *LimitInfo {
 	}
 
 	return &LimitInfo{Detected: false}
+}
+
+// IsClaudeCodePane checks if the pane content appears to be a Claude Code session
+// by looking for the characteristic input prompt with box-drawing characters.
+func IsClaudeCodePane(content string) bool {
+	return claudeCodePromptPattern.MatchString(content)
 }
 
 // parseOldFormat parses a Unix timestamp string.

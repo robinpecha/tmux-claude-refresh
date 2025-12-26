@@ -538,3 +538,61 @@ func BenchmarkParseNewFormat(b *testing.B) {
 		parseNewFormat("3", "pm")
 	}
 }
+
+func TestIsClaudeCodePane(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    bool
+	}{
+		{
+			name:    "claude code prompt - full format",
+			content: "Some output\n────────────────────────────────────────────────────────────────────────────────\n> \n────────────────────────────────────────────────────────────────────────────────\n  opus workspace\n",
+			want:    true,
+		},
+		{
+			name:    "claude code prompt with nbsp",
+			content: "Previous output\n────────────────────────────────────────────────\n>\xc2\xa0\n────────────────────────────────────────────────\n",
+			want:    true,
+		},
+		{
+			name:    "claude code prompt minimal",
+			content: "──────────────────────────────────────\n>\n──────────────────────────────────────\n",
+			want:    true,
+		},
+		{
+			name:    "not claude code - regular terminal",
+			content: "$ ls -la\ntotal 123\ndrwxr-xr-x 5 user staff 160 Dec 26 10:00 .\n",
+			want:    false,
+		},
+		{
+			name:    "not claude code - no prompt between dashes",
+			content: "────────────────────────────────────────────────\n────────────────────────────────────────────────\n",
+			want:    false,
+		},
+		{
+			name:    "not enough dashes",
+			content: "─────\n> \n─────\n",
+			want:    false,
+		},
+		{
+			name:    "only one line of dashes",
+			content: "────────────────────────────────────────────────\n> \nSome other text",
+			want:    false,
+		},
+		{
+			name:    "empty content",
+			content: "",
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsClaudeCodePane(tt.content)
+			if got != tt.want {
+				t.Errorf("IsClaudeCodePane() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

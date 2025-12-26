@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/henryaj/autoclaude/internal/watcher"
 )
@@ -27,9 +28,12 @@ DESCRIPTION:
     It will monitor all other panes in the same window.
 
 OPTIONS:
-    -v          Enable verbose/debug logging
-    -version    Show version information
-    -test       Test mode: wait 10s then send resume sequence to another pane
+    -v              Enable verbose/debug logging
+    -version        Show version information
+    -test           Test mode: wait 10s then send resume sequence to another pane
+    -force DELAY    Periodically send "continue" to Claude Code panes at DELAY
+                    interval (e.g., -force 30s, -force 1m). Use when Claude stops
+                    working mid-task without hitting rate limits.
 
 EXAMPLE:
     # Split your tmux window and run autoclaude in one pane
@@ -39,12 +43,19 @@ EXAMPLE:
     # With verbose logging
     autoclaude -v
 
+    # Force continue every 30 seconds
+    autoclaude -force 30s
+
 HOW IT WORKS:
     1. Polls all tmux panes in the current window every 5 seconds
     2. Detects rate limit messages (e.g., "Usage limit reached")
     3. Parses the reset time from the message
     4. Waits until the limit resets, plus a random 5-10 second delay
     5. Sends Enter (to dismiss any selector menu) then "continue" + Enter
+
+    With -force mode:
+    - Detects Claude Code panes by their input prompt (────> pattern)
+    - Sends "continue" at the specified interval to keep Claude working
 
 REQUIREMENTS:
     - Must be run inside a tmux session
@@ -53,9 +64,10 @@ REQUIREMENTS:
 
 func main() {
 	var (
-		verbose     bool
-		showVersion bool
-		testMode    bool
+		verbose       bool
+		showVersion   bool
+		testMode      bool
+		forceInterval time.Duration
 	)
 
 	flag.Usage = func() {
@@ -65,6 +77,7 @@ func main() {
 	flag.BoolVar(&verbose, "v", false, "Enable verbose logging")
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
 	flag.BoolVar(&testMode, "test", false, "Test mode: wait 10s then send resume sequence")
+	flag.DurationVar(&forceInterval, "force", 0, "Force continue at interval (e.g., 30s, 1m)")
 	flag.Parse()
 
 	if showVersion {
@@ -72,7 +85,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	w, err := watcher.New(verbose, testMode)
+	w, err := watcher.New(verbose, testMode, forceInterval)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		fmt.Fprintln(os.Stderr, "Make sure you're running this inside a tmux session.")

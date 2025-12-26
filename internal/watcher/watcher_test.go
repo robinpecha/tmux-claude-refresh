@@ -120,7 +120,7 @@ func TestNewWatcher_NotInTmux(t *testing.T) {
 		}
 	}()
 
-	_, err := New(false, false)
+	_, err := New(false, false, 0)
 	if err == nil {
 		t.Error("New() should fail when not in tmux session")
 	}
@@ -144,7 +144,7 @@ func TestNewWatcher_NoPaneEnv(t *testing.T) {
 		}
 	}()
 
-	_, err := New(false, false)
+	_, err := New(false, false, 0)
 	if err == nil {
 		t.Error("New() should fail when TMUX_PANE not set")
 	}
@@ -172,9 +172,10 @@ func TestWatcherConstants(t *testing.T) {
 // TestWatcherStruct verifies watcher struct fields are set correctly.
 func TestWatcherStruct(t *testing.T) {
 	w := &Watcher{
-		window:   "@1",
-		verbose:  true,
-		testMode: true,
+		window:        "@1",
+		verbose:       true,
+		testMode:      true,
+		forceInterval: 30 * time.Second,
 	}
 
 	if w.window != "@1" {
@@ -185,6 +186,9 @@ func TestWatcherStruct(t *testing.T) {
 	}
 	if !w.testMode {
 		t.Error("testMode should be true")
+	}
+	if w.forceInterval != 30*time.Second {
+		t.Errorf("forceInterval = %v, want 30s", w.forceInterval)
 	}
 }
 

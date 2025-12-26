@@ -20,13 +20,14 @@ const (
 
 // Watcher monitors tmux panes for Claude usage limits.
 type Watcher struct {
-	window   string
-	verbose  bool
-	testMode bool
+	window        string
+	verbose       bool
+	testMode      bool
+	forceInterval time.Duration
 }
 
 // New creates a new Watcher for the current tmux window.
-func New(verbose bool, testMode bool) (*Watcher, error) {
+func New(verbose bool, testMode bool, forceInterval time.Duration) (*Watcher, error) {
 	if err := tmux.ValidateEnvironment(); err != nil {
 		return nil, err
 	}
@@ -37,9 +38,10 @@ func New(verbose bool, testMode bool) (*Watcher, error) {
 	}
 
 	return &Watcher{
-		window:   window,
-		verbose:  verbose,
-		testMode: testMode,
+		window:        window,
+		verbose:       verbose,
+		testMode:      testMode,
+		forceInterval: forceInterval,
 	}, nil
 }
 
@@ -47,6 +49,10 @@ func New(verbose bool, testMode bool) (*Watcher, error) {
 func (w *Watcher) Run(ctx context.Context) error {
 	if w.testMode {
 		return w.runTestMode(ctx)
+	}
+
+	if w.forceInterval > 0 {
+		return w.runForceMode(ctx)
 	}
 
 	w.log("Starting autoclaude watcher...")
@@ -120,6 +126,63 @@ func (w *Watcher) runTestMode(ctx context.Context) error {
 
 	w.log("TEST MODE: Complete")
 	return nil
+}
+
+// runForceMode periodically sends "continue" to Claude Code panes.
+func (w *Watcher) runForceMode(ctx context.Context) error {
+	w.log("Starting autoclaude in FORCE mode...")
+	w.log("Watching tmux window: %s", w.window)
+	w.log("Force interval: %v", w.forceInterval)
+
+	ticker := time.NewTicker(w.forceInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			w.log("Shutting down...")
+			return nil
+		case <-ticker.C:
+			w.forceOnce(ctx)
+		}
+	}
+}
+
+// forceOnce sends "continue" to all Claude Code panes.
+func (w *Watcher) forceOnce(ctx context.Context) {
+	w.debug("--- Force cycle starting ---")
+
+	panes, err := tmux.ListPanes(w.window)
+	if err != nil {
+		w.log("ERROR: Failed to list panes: %v", err)
+		return
+	}
+
+	currentPane, _ := tmux.GetCurrentPane()
+	w.debug("Found %d pane(s) in window %s", len(panes), w.window)
+
+	for _, pane := range panes {
+		if pane == currentPane {
+			continue
+		}
+
+		content, err := tmux.CapturePaneContent(pane)
+		if err != nil {
+			w.log("ERROR: Failed to capture pane %s: %v", pane, err)
+			continue
+		}
+
+		if detector.IsClaudeCodePane(content) {
+			w.log("Sending 'continue' to Claude Code pane %s", pane)
+			if err := tmux.SendKeys(pane, resumeMsg); err != nil {
+				w.log("ERROR: Failed to send continue: %v", err)
+			}
+		} else {
+			w.debug("Pane %s is not a Claude Code pane, skipping", pane)
+		}
+	}
+
+	w.debug("--- Force cycle complete ---")
 }
 
 func (w *Watcher) pollOnce(ctx context.Context) {
