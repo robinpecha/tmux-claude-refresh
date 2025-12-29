@@ -426,7 +426,7 @@ func (m Model) View() string {
 					statusText = lipgloss.NewStyle().Foreground(lipgloss.Color("#50fa7b")).Render("● Auto-continue enabled")
 					// Add rate limit info on same line if applicable (only when auto mode)
 					if pane.IsRateLimited {
-						rateLimitText := errorStyle.Render(" ⏳ Rate limited")
+						rateLimitText := errorStyle.Render("  ⏳ Rate limited")
 						if pane.RateLimitResets != "" {
 							rateLimitText += dimTextStyle.Render(" resets " + pane.RateLimitResets)
 						}
