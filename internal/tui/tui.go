@@ -504,7 +504,9 @@ sends "continue" when rate limits reset.
   Enter → "continue" → Enter
 
   Polling occurs every 10 seconds.
-`
+
+` + dimTextStyle.Render("Made by Henry Stanley (henrystanley.com)") + `
+` + dimTextStyle.Render("Built with Claude Code")
 
 	footer := dimTextStyle.Render("Press any key to close")
 
