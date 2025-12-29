@@ -318,9 +318,29 @@ func (m *Model) cycleMode() {
 
 	if pane.Mode == tmux.ModeOff {
 		pane.Mode = tmux.ModeContinueOnRateLimit
+		// Check rate limit immediately when enabling
+		m.checkPaneRateLimit(pane)
 	} else {
 		pane.Mode = tmux.ModeOff
 	}
+}
+
+// checkPaneRateLimit checks the rate limit status for a single pane
+func (m *Model) checkPaneRateLimit(pane *tmux.Pane) {
+	if pane == nil || pane.ID == m.ownPaneID {
+		return
+	}
+
+	content, err := tmux.CapturePane(pane.ID)
+	if err != nil {
+		return
+	}
+
+	status := detection.CheckRateLimit(content)
+	pane.IsRateLimited = status.IsLimited
+	pane.RateLimitResets = status.ResetsAt
+	pane.RateLimitTime = status.ResetTime
+	pane.ContinueSent = false
 }
 
 func (m *Model) enableAll() {
@@ -330,6 +350,7 @@ func (m *Model) enableAll() {
 	for _, pane := range m.layout.Panes {
 		if pane.HasClaudeCode {
 			pane.Mode = tmux.ModeContinueOnRateLimit
+			m.checkPaneRateLimit(pane)
 		}
 	}
 }
@@ -403,16 +424,16 @@ func (m Model) View() string {
 				// Always show auto-continue status first
 				if pane.Mode == tmux.ModeContinueOnRateLimit {
 					statusText = lipgloss.NewStyle().Foreground(lipgloss.Color("#50fa7b")).Render("● Auto-continue enabled")
+					// Add rate limit info on same line if applicable (only when auto mode)
+					if pane.IsRateLimited {
+						rateLimitText := errorStyle.Render(" ⏳ Rate limited")
+						if pane.RateLimitResets != "" {
+							rateLimitText += dimTextStyle.Render(" resets " + pane.RateLimitResets)
+						}
+						statusText += rateLimitText
+					}
 				} else {
 					statusText = dimTextStyle.Render("○ Auto-continue disabled")
-				}
-				// Add rate limit info on same line if applicable
-				if pane.IsRateLimited {
-					rateLimitText := errorStyle.Render(" ⏳ Rate limited")
-					if pane.RateLimitResets != "" {
-						rateLimitText += dimTextStyle.Render(" resets " + pane.RateLimitResets)
-					}
-					statusText += rateLimitText
 				}
 			}
 		}

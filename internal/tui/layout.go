@@ -125,7 +125,8 @@ func drawPane(grid [][]string, p *tmux.Pane, selected bool, scaleX, scaleY float
 
 	// Determine colors based on state
 	var borderColor, labelColor lipgloss.Color
-	if p.IsRateLimited {
+	if p.IsRateLimited && p.Mode == tmux.ModeContinueOnRateLimit {
+		// Rate limited with auto mode: red
 		borderColor = rateLimitRed
 		labelColor = rateLimitRed
 	} else if p.HasClaudeCode && p.Mode == tmux.ModeContinueOnRateLimit {
@@ -185,23 +186,28 @@ func drawPane(grid [][]string, p *tmux.Pane, selected bool, scaleX, scaleY float
 	paneWidth := x2 - x1 - 2 // Available width inside borders
 
 	if p.HasClaudeCode {
-		// CC panes: show status on center line, label below
-		var statusLabel string
-		if p.IsRateLimited {
-			if p.RateLimitResets != "" {
-				statusLabel = "⏳ " + p.RateLimitResets
-			} else {
-				statusLabel = "⏳ limited"
-			}
-		} else {
-			statusLabel = p.Mode.String()
-		}
+		// CC panes: always show mode (auto/off) on center line
+		statusLabel := p.Mode.String()
 		drawCenteredText(grid, statusLabel, x1, x2, centerY, labelStyle)
 
+		// Show rate limit info below mode if auto and rate limited
+		nextLine := centerY + 1
+		if p.IsRateLimited && p.Mode == tmux.ModeContinueOnRateLimit && nextLine < y2 {
+			var rateLimitLabel string
+			if p.RateLimitResets != "" {
+				rateLimitLabel = "⏳ " + p.RateLimitResets
+			} else {
+				rateLimitLabel = "⏳ limited"
+			}
+			rateLimitStyle := lipgloss.NewStyle().Foreground(rateLimitRed)
+			drawCenteredText(grid, rateLimitLabel, x1, x2, nextLine, rateLimitStyle)
+			nextLine++
+		}
+
 		// Show "Claude Code" label below if there's room
-		if centerY+1 < y2 {
+		if nextLine < y2 {
 			titleStyle := lipgloss.NewStyle().Foreground(labelColor).Italic(true)
-			drawCenteredText(grid, "Claude Code", x1, x2, centerY+1, titleStyle)
+			drawCenteredText(grid, "Claude Code", x1, x2, nextLine, titleStyle)
 		}
 	} else {
 		// Non-CC panes: just show title in italics
