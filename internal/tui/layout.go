@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/henryaj/autoclaude/internal/tmux"
+	"github.com/mattn/go-runewidth"
 )
 
 // Colors for pane rendering - bold, high-contrast
@@ -214,30 +215,33 @@ func drawPane(grid [][]string, p *tmux.Pane, selected bool, scaleX, scaleY float
 
 // drawCenteredText draws text centered horizontally between x1 and x2
 func drawCenteredText(grid [][]string, text string, x1, x2, y int, style lipgloss.Style) {
-	textRunes := []rune(text)
-	textLen := len(textRunes)
-	labelX := x1 + (x2-x1-textLen)/2
+	textWidth := runewidth.StringWidth(text)
+	labelX := x1 + (x2-x1-textWidth)/2
 
-	if labelX > x1 && labelX+textLen < x2 && y >= 0 && y < len(grid) {
-		for i, r := range textRunes {
-			setCell(grid, labelX+i, y, style.Render(string(r)))
+	if labelX > x1 && labelX+textWidth < x2 && y >= 0 && y < len(grid) {
+		x := labelX
+		for _, r := range text {
+			w := runewidth.RuneWidth(r)
+			if w > 0 {
+				setCell(grid, x, y, style.Render(string(r)))
+				x += w
+			}
 		}
 	}
 }
 
-// truncate shortens a string to fit within maxLen
+// truncate shortens a string to fit within maxLen display width
 func truncate(s string, maxLen int) string {
 	if maxLen <= 0 {
 		return ""
 	}
-	runes := []rune(s)
-	if len(runes) <= maxLen {
+	if runewidth.StringWidth(s) <= maxLen {
 		return s
 	}
 	if maxLen <= 3 {
-		return string(runes[:maxLen])
+		return runewidth.Truncate(s, maxLen, "")
 	}
-	return string(runes[:maxLen-1]) + "…"
+	return runewidth.Truncate(s, maxLen, "…")
 }
 
 // setCell safely sets a cell in the grid
