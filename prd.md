@@ -117,6 +117,12 @@ type PaneStatusMsg { PaneID string; HasClaudeCode bool; RateLimit RateLimitStatu
 type PollTickMsg time.Time
 ```
 
+### Phase 8: Stretch Goals
+**Files:** `internal/tui/tui.go`, `internal/tui/styles.go`
+
+- `r` key: Manually refresh the pane layout (re-run `tmux list-panes` and update display)
+- Bold, distinctive color scheme: Replace generic styling with a high-contrast, visually striking palette (use `/terminal-ui-design` skill for implementation)
+
 ## Error Handling
 
 - Fail fast if not in tmux (check `$TMUX` env var)
