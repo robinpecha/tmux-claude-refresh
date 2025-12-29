@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Claude Code UI patterns
+// Claude Code UI patterns - multiple approaches for robustness
 var (
 	// Box-drawing characters used in Claude Code's UI
 	boxDrawingPattern = regexp.MustCompile(`[─│┌┐└┘├┤┬┴┼╭╮╯╰]`)
@@ -13,22 +13,54 @@ var (
 	// The input prompt pattern: > at start of line (with possible ANSI codes)
 	promptPattern = regexp.MustCompile(`(?m)^(\x1b\[[0-9;]*m)*>\s`)
 
-	// Alternative: look for the Claude Code status bar patterns
+	// Claude Code status bar patterns (model names, etc.)
 	statusBarPattern = regexp.MustCompile(`(?i)(claude|anthropic|sonnet|opus|haiku)`)
+
+	// Footer hint that appears in both prompt and menu modes
+	footerHintPattern = regexp.MustCompile(`ctrl-g to edit`)
+
+	// Menu selector used in question/choice UI
+	menuSelectorPattern = regexp.MustCompile(`❯`)
+
+	// Rate limit message - definitive proof it's Claude Code
+	rateLimitMsgPattern = regexp.MustCompile(`(?i)limit\s+reached`)
+
+	// Dashed separator line used in Claude Code UI
+	dashedSeparator = regexp.MustCompile(`╌{10,}`)
 )
 
 // IsClaudeCode detects if pane content appears to be running Claude Code
 func IsClaudeCode(content string) bool {
-	// Must have box-drawing characters (Claude Code uses them extensively)
+	// Rate limit message is definitive - if we see it, it's Claude Code
+	if rateLimitMsgPattern.MatchString(content) {
+		return true
+	}
+
+	// Footer hint is very reliable
+	if footerHintPattern.MatchString(content) {
+		return true
+	}
+
+	// Must have box-drawing characters for other detection methods
 	if !boxDrawingPattern.MatchString(content) {
 		return false
 	}
 
-	// Must have the > prompt OR Claude-related text
-	hasPrompt := promptPattern.MatchString(content)
-	hasStatusBar := statusBarPattern.MatchString(content)
+	// Any of these patterns indicate Claude Code
+	if promptPattern.MatchString(content) {
+		return true
+	}
+	if statusBarPattern.MatchString(content) {
+		return true
+	}
+	if menuSelectorPattern.MatchString(content) {
+		return true
+	}
+	if dashedSeparator.MatchString(content) {
+		return true
+	}
 
-	return hasPrompt || hasStatusBar
+	return false
 }
 
 // StripANSI removes ANSI escape codes from a string
