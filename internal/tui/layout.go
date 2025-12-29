@@ -11,6 +11,7 @@ import (
 // Colors for pane rendering
 var (
 	claudeOrange    = lipgloss.Color("#e07c3e") // Claude Code orange
+	autoGreen       = lipgloss.Color("#50fa7b") // Green for auto mode
 	selectedColor   = lipgloss.Color("#00d7ff") // Cyan for selected
 	unselectedColor = lipgloss.Color("#4a4a4a") // Dark gray for unselected
 	rateLimitRed    = lipgloss.Color("#ff5555") // Red for rate limited
@@ -126,7 +127,12 @@ func drawPane(grid [][]string, p *tmux.Pane, selected bool, scaleX, scaleY float
 	if p.IsRateLimited {
 		borderColor = rateLimitRed
 		labelColor = rateLimitRed
+	} else if p.HasClaudeCode && p.Mode == tmux.ModeContinueOnRateLimit {
+		// Auto mode: green
+		borderColor = autoGreen
+		labelColor = autoGreen
 	} else if p.HasClaudeCode {
+		// Claude Code but off: orange
 		borderColor = claudeOrange
 		labelColor = claudeOrange
 	} else if selected {

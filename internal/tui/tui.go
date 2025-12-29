@@ -67,9 +67,10 @@ type Model struct {
 	height         int
 	layout         *tmux.Layout
 	selectedPaneID string
-	ownPaneID      string // The pane running autoclaude (excluded from detection)
-	ownWindowID    string // The window to monitor (pinned at startup)
+	ownPaneID      string    // The pane running autoclaude (excluded from detection)
+	ownWindowID    string    // The window to monitor (pinned at startup)
 	err            error
+	errTime        time.Time // When the error occurred (for auto-clear)
 }
 
 func New(version string) Model {
@@ -141,6 +142,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case initMsg:
 		if msg.err != nil {
 			m.err = msg.err
+			m.errTime = time.Now()
 			return m, nil
 		}
 		m.ownPaneID = msg.ownPaneID
@@ -152,11 +154,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case layoutUpdateMsg:
 		if msg.err != nil {
 			m.err = msg.err
+			m.errTime = time.Now()
 		} else {
 			m.updateLayout(msg.layout)
 		}
 
 	case pollTickMsg:
+		// Clear errors after 10 seconds
+		if m.err != nil && time.Since(m.errTime) > 10*time.Second {
+			m.err = nil
+		}
 		m.pollPanes()
 		return m, tea.Batch(fetchLayoutCmd(m.ownWindowID), tickCmd())
 	}
@@ -321,8 +328,33 @@ func (m Model) View() string {
 		Height(mainHeight).
 		Render(content)
 
-	// Footer with help
-	footer := dimTextStyle.Render("  ←↑↓→ navigate • tab toggle mode • q quit")
+	// Footer with selected pane info and help
+	var footerParts []string
+
+	// Show selected pane status
+	if m.layout != nil {
+		if pane := m.layout.PaneByID(m.selectedPaneID); pane != nil {
+			if pane.HasClaudeCode {
+				var status string
+				if pane.IsRateLimited {
+					status = errorStyle.Render("⏳ Rate limited")
+					if pane.RateLimitResets != "" {
+						status += dimTextStyle.Render(" resets " + pane.RateLimitResets)
+					}
+				} else if pane.Mode == tmux.ModeContinueOnRateLimit {
+					status = lipgloss.NewStyle().Foreground(lipgloss.Color("#50fa7b")).Render("● Auto-continue enabled")
+				} else {
+					status = dimTextStyle.Render("○ Auto-continue disabled")
+				}
+				footerParts = append(footerParts, status)
+			}
+		}
+	}
+
+	// Help text
+	footerParts = append(footerParts, dimTextStyle.Render("←↑↓→ navigate • tab toggle • q quit"))
+
+	footer := "  " + lipgloss.JoinHorizontal(lipgloss.Center, footerParts...)
 
 	// Compose the full view
 	return lipgloss.JoinVertical(lipgloss.Left, header, mainPane, footer)
