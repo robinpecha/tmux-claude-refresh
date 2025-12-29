@@ -13,6 +13,7 @@ var (
 	claudeOrange    = lipgloss.Color("#e07c3e") // Claude Code orange
 	selectedColor   = lipgloss.Color("#00d7ff") // Cyan for selected
 	unselectedColor = lipgloss.Color("#4a4a4a") // Dark gray for unselected
+	rateLimitRed    = lipgloss.Color("#ff5555") // Red for rate limited
 )
 
 // Box drawing characters
@@ -122,7 +123,10 @@ func drawPane(grid [][]string, p *tmux.Pane, selected bool, scaleX, scaleY float
 
 	// Determine colors based on state
 	var borderColor, labelColor lipgloss.Color
-	if p.HasClaudeCode {
+	if p.IsRateLimited {
+		borderColor = rateLimitRed
+		labelColor = rateLimitRed
+	} else if p.HasClaudeCode {
 		borderColor = claudeOrange
 		labelColor = claudeOrange
 	} else if selected {
@@ -174,11 +178,20 @@ func drawPane(grid [][]string, p *tmux.Pane, selected bool, scaleX, scaleY float
 	paneWidth := x2 - x1 - 2 // Available width inside borders
 
 	if p.HasClaudeCode {
-		// CC panes: show mode on center line, "claude code" below
-		modeLabel := p.Mode.String()
-		drawCenteredText(grid, modeLabel, x1, x2, centerY, labelStyle)
+		// CC panes: show status on center line, label below
+		var statusLabel string
+		if p.IsRateLimited {
+			if p.RateLimitResets != "" {
+				statusLabel = "⏳ " + p.RateLimitResets
+			} else {
+				statusLabel = "⏳ limited"
+			}
+		} else {
+			statusLabel = p.Mode.String()
+		}
+		drawCenteredText(grid, statusLabel, x1, x2, centerY, labelStyle)
 
-		// Show "claude code" label below if there's room
+		// Show "Claude Code" label below if there's room
 		if centerY+1 < y2 {
 			titleStyle := lipgloss.NewStyle().Foreground(labelColor).Italic(true)
 			drawCenteredText(grid, "Claude Code", x1, x2, centerY+1, titleStyle)

@@ -170,7 +170,19 @@ func (m *Model) pollPanes() {
 		if err != nil {
 			continue
 		}
+
 		pane.HasClaudeCode = detection.IsClaudeCode(content)
+
+		// Check rate limit status for Claude Code panes
+		if pane.HasClaudeCode {
+			status := detection.CheckRateLimit(content)
+			pane.WasRateLimited = pane.IsRateLimited
+			pane.IsRateLimited = status.IsLimited
+			pane.RateLimitResets = status.ResetsAt
+		} else {
+			pane.IsRateLimited = false
+			pane.RateLimitResets = ""
+		}
 	}
 }
 
@@ -181,6 +193,9 @@ func (m *Model) updateLayout(layout *tmux.Layout) {
 			if oldPane := m.layout.PaneByID(newPane.ID); oldPane != nil {
 				newPane.Mode = oldPane.Mode
 				newPane.HasClaudeCode = oldPane.HasClaudeCode
+				newPane.IsRateLimited = oldPane.IsRateLimited
+				newPane.RateLimitResets = oldPane.RateLimitResets
+				newPane.WasRateLimited = oldPane.WasRateLimited
 			}
 		}
 	}
