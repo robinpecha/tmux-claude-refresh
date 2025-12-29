@@ -76,6 +76,7 @@ type Model struct {
 	testPattern      string    // Test mode: trigger on this string instead of rate limit
 	lastContinueSent time.Time // When we last sent a continue command
 	lastContinuePane string    // Which pane we sent it to
+	showHelp         bool      // Whether to show the help overlay
 }
 
 func New(version string, testPattern string) Model {
@@ -126,9 +127,17 @@ func fetchLayoutCmd(windowID string) tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// If help is shown, any key dismisses it
+		if m.showHelp {
+			m.showHelp = false
+			return m, nil
+		}
+
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "h", "?":
+			m.showHelp = true
 		case "left":
 			m.moveSelection(tmux.DirLeft)
 		case "right":
@@ -367,6 +376,11 @@ func (m *Model) disableAll() {
 }
 
 func (m Model) View() string {
+	// Show help overlay if active
+	if m.showHelp {
+		return m.renderHelp()
+	}
+
 	// Header with title and version
 	title := titleStyle.Render("autoclaude")
 	version := versionStyle.Render(fmt.Sprintf("v%s", m.version))
@@ -439,7 +453,7 @@ func (m Model) View() string {
 		}
 	}
 
-	helpText := dimTextStyle.Render("←↑↓→ nav • tab toggle • a on • n off • r refresh • q quit")
+	helpText := dimTextStyle.Render("←↑↓→ nav • tab toggle • a on • n off • r refresh • h help • q quit")
 
 	// Footer: status on first line, help on second line (both left-aligned)
 	var footer string
@@ -451,4 +465,52 @@ func (m Model) View() string {
 
 	// Compose the full view
 	return lipgloss.JoinVertical(lipgloss.Left, header, mainPane, footer)
+}
+
+func (m Model) renderHelp() string {
+	helpStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(accentCyan).
+		Padding(1, 2).
+		Width(m.width - 4)
+
+	titleLine := titleStyle.Render("autoclaude") + " " + versionStyle.Render(fmt.Sprintf("v%s", m.version))
+
+	helpContent := `
+Monitors tmux panes running Claude Code and automatically
+sends "continue" when rate limits reset.
+
+` + lipgloss.NewStyle().Bold(true).Foreground(accentCyan).Render("KEYS") + `
+
+  ←↑↓→      Navigate between panes
+  tab       Toggle auto-continue for selected pane
+  a         Enable auto-continue for all Claude Code panes
+  n         Disable auto-continue for all Claude Code panes
+  r         Refresh pane layout
+  h / ?     Show this help
+  q         Quit
+
+` + lipgloss.NewStyle().Bold(true).Foreground(accentCyan).Render("PANE COLORS") + `
+
+  ` + lipgloss.NewStyle().Foreground(claudeOrange).Render("Orange") + `      Claude Code pane (auto-continue off)
+  ` + lipgloss.NewStyle().Foreground(autoGreen).Render("Green") + `       Claude Code pane (auto-continue on)
+  ` + lipgloss.NewStyle().Foreground(rateLimitRed).Render("Red") + `         Rate limited (waiting for reset)
+  ` + lipgloss.NewStyle().Foreground(accentCyan).Render("Cyan") + `        Selected pane
+
+` + lipgloss.NewStyle().Bold(true).Foreground(accentCyan).Render("HOW IT WORKS") + `
+
+  When a Claude Code pane shows "limit reached ∙ resets Xpm",
+  autoclaude waits for that time to pass, then sends:
+  Enter → "continue" → Enter
+
+  Polling occurs every 10 seconds.
+`
+
+	footer := dimTextStyle.Render("Press any key to close")
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		"",
+		helpStyle.Render(titleLine+helpContent),
+		"  "+footer,
+	)
 }
