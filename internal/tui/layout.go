@@ -194,12 +194,17 @@ func drawPane(grid [][]string, p *tmux.Pane, selected bool, scaleX, scaleY float
 		nextLine := centerY + 1
 		if p.IsRateLimited && p.Mode == tmux.ModeContinueOnRateLimit && nextLine < y2 {
 			var rateLimitLabel string
-			if p.RateLimitResets != "" {
+			var rateLimitStyle lipgloss.Style
+			if p.ContinueSent {
+				rateLimitLabel = "continue sent"
+				rateLimitStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#f1fa8c")) // Yellow
+			} else if p.RateLimitResets != "" {
 				rateLimitLabel = "resets " + p.RateLimitResets
+				rateLimitStyle = lipgloss.NewStyle().Foreground(rateLimitRed)
 			} else {
 				rateLimitLabel = "rate limited"
+				rateLimitStyle = lipgloss.NewStyle().Foreground(rateLimitRed)
 			}
-			rateLimitStyle := lipgloss.NewStyle().Foreground(rateLimitRed)
 			drawCenteredText(grid, rateLimitLabel, x1, x2, nextLine, rateLimitStyle)
 			nextLine++
 		}

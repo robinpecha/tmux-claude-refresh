@@ -1,0 +1,20 @@
+      493 +        # Redirect to next
+      494 +        return redirect('/validate')
+      495
+      496      # GET: Show validation form
+      497      gender_filter = request.args.get('gender', '')
+  ⎿  You've hit your limit · resets 8pm (Europe/London)
+     Opening your options…
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+> 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  [Opus 4.5 | Max] ████████░░ 82% | ⏱️  2h 41m
+  gender-biased-advice-paper git:(master*)
+  ⚠ Limit reached (resets 8m)
+  ✓ Bash ×10 | ✓ Read ×4 | ✓ Edit ×4 | ✓ Write ×1
+  ✓ Explore: Explore classification system (1m 10s)
+  ✓ All todos complete (4/4)
+  ⏵⏵ bypass permissions on · cd /Users/henryaj/workspace/gender-bias… (running)
+
+
