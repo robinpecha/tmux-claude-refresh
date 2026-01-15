@@ -100,8 +100,10 @@ func CheckRateLimit(content string) RateLimitStatus {
 
 	timeUntil := resetTime.Sub(now)
 
-	// If the time is in the past, it might be for tomorrow
-	if timeUntil < 0 {
+	// If the time is more than 1 hour in the past, it's likely for tomorrow.
+	// But if it's within the last hour, keep it as-is so we can detect
+	// that the reset time has passed and trigger the continue action.
+	if timeUntil < -1*time.Hour {
 		resetTime = resetTime.Add(24 * time.Hour)
 		timeUntil = resetTime.Sub(now)
 	}
