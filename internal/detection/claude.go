@@ -24,7 +24,8 @@ var (
 
 	// Rate limit messages - definitive proof it's Claude Code
 	rateLimitMsgPattern    = regexp.MustCompile(`(?i)limit\s+reached`)
-	rateLimitMsgPatternAlt = regexp.MustCompile(`(?i)hit\s+your\s+limit`)
+	rateLimitMsgPatternAlt = regexp.MustCompile(`(?i)hit\s+your\s+(?:\w+\s+)?limit`)
+	rateLimitMsgPatternAlt2 = regexp.MustCompile(`(?i)you're\s+out\s+of\s+extra\s+usage`)
 
 	// Dashed separator line used in Claude Code UI
 	dashedSeparator = regexp.MustCompile(`╌{10,}`)
@@ -33,7 +34,7 @@ var (
 // IsClaudeCode detects if pane content appears to be running Claude Code
 func IsClaudeCode(content string) bool {
 	// Rate limit message is definitive - if we see it, it's Claude Code
-	if rateLimitMsgPattern.MatchString(content) || rateLimitMsgPatternAlt.MatchString(content) {
+	if rateLimitMsgPattern.MatchString(content) || rateLimitMsgPatternAlt.MatchString(content) || rateLimitMsgPatternAlt2.MatchString(content) {
 		return true
 	}
 

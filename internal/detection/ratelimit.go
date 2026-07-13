@@ -18,22 +18,33 @@ type RateLimitStatus struct {
 // Rate limit patterns - multiple formats Claude Code uses
 // Examples: "limit reached ∙ resets 2pm", "limit reached ∙ resets 10:30am"
 //           "You've hit your limit · resets 10pm (Europe/London)"
+//           "You've hit your session limit · resets 2:20pm (Europe/Dublin)"
+//           "You've hit your weekly limit · resets 9am"
+//           "You're out of extra usage · resets 8pm (Europe/London)"
 //           "Limit reached (resets 8m)" - minutes remaining format
+//
+// The `(?:\w+\s+)?` allows an optional qualifier word that Claude Code now
+// inserts between "your" and "limit" (e.g. "session", "weekly").
 var rateLimitPatterns = []*regexp.Regexp{
-	// New format: "You've hit your limit · resets 10pm (Europe/London)"
-	regexp.MustCompile(`(?i)hit\s+your\s+limit.*resets?\s+(\d{1,2}(?::\d{2})?\s*[ap]m)`),
+	// New format: "You've hit your [session|weekly] limit · resets 10pm (Europe/London)"
+	regexp.MustCompile(`(?i)hit\s+your\s+(?:\w+\s+)?limit.*resets?\s+(\d{1,2}(?::\d{2})?\s*[ap]m)`),
+	// New format (extra usage): "You're out of extra usage · resets 8pm (Europe/London)"
+	regexp.MustCompile(`(?i)you're\s+out\s+of\s+extra\s+usage.*resets?\s+(\d{1,2}(?::\d{2})?\s*[ap]m)`),
 	// Original format: "limit reached ∙ resets 2pm"
 	regexp.MustCompile(`(?i)limit\s+reached.*resets?\s+(\d{1,2}(?::\d{2})?\s*[ap]m)`),
 	// Minutes remaining format: "Limit reached (resets 8m)" or "resets 45m"
-	regexp.MustCompile(`(?i)(?:hit\s+your\s+limit|limit\s+reached).*resets?\s+(\d{1,3})m\b`),
+	regexp.MustCompile(`(?i)(?:hit\s+your\s+(?:\w+\s+)?limit|you're\s+out\s+of\s+extra\s+usage|limit\s+reached).*resets?\s+(\d{1,3})m\b`),
 }
 
 // Fallback patterns - detect rate limit without capturing time
 // Used when we can't parse a specific reset time
 // These patterns are more specific to avoid false positives
 var rateLimitFallbackPatterns = []*regexp.Regexp{
-	// "You've hit your limit" - Claude Code's primary message
-	regexp.MustCompile(`(?i)you['']ve\s+hit\s+your\s+limit`),
+	// "You've hit your [session] limit" - Claude Code's primary message
+	// `(?:\w+\s+)?` also matches "your session limit" / "your weekly limit"
+	regexp.MustCompile(`(?i)you['']ve\s+hit\s+your\s+(?:\w+\s+)?limit`),
+	// "You're out of extra usage"
+	regexp.MustCompile(`(?i)you're\s+out\s+of\s+extra\s+usage`),
 	// "Limit reached" at word boundary (not "rate limit exceeded" or similar)
 	regexp.MustCompile(`(?i)\blimit\s+reached\b`),
 	// "rate limited" as a status indicator
@@ -70,8 +81,8 @@ func CheckRateLimit(content string) RateLimitStatus {
 	resetStr := match[1]
 	now := time.Now()
 
-	// Pattern index 2 is the minutes-remaining format (e.g., "8m" -> "8")
-	if patternIdx == 2 {
+	// The last pattern is the minutes-remaining format (e.g., "8m" -> "8")
+	if patternIdx == len(rateLimitPatterns)-1 {
 		minutes, err := strconv.Atoi(resetStr)
 		if err != nil {
 			return RateLimitStatus{

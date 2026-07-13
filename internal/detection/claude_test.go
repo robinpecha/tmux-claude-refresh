@@ -53,6 +53,21 @@ func TestIsClaudeCode_Patterns(t *testing.T) {
 			want:    true,
 		},
 		{
+			name:    "hit your session limit message",
+			content: "You've hit your session limit · resets 2:20pm",
+			want:    true,
+		},
+		{
+			name:    "hit your weekly limit message",
+			content: "You've hit your weekly limit · resets 9am",
+			want:    true,
+		},
+		{
+			name:    "out of extra usage message",
+			content: "You're out of extra usage · resets 8pm",
+			want:    true,
+		},
+		{
 			name:    "footer hint",
 			content: "ctrl-g to edit",
 			want:    true,
