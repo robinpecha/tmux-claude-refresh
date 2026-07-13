@@ -1,6 +1,6 @@
 version: 2
 
-project_name: autoclaude
+project_name: tmux-claude-refresh
 
 before:
   hooks:
@@ -19,7 +19,7 @@ builds:
       - -s -w -X main.version={{.Version}}
 
 archives:
-  # Versioned archive: autoclaude_0.1.4_linux_amd64.tar.gz (for pinning)
+  # Versioned archive: tmux-claude-refresh_0.1.5_linux_amd64.tar.gz (for pinning)
   - id: versioned
     format: tar.gz
     name_template: >-
@@ -27,7 +27,7 @@ archives:
       {{- .Version }}_
       {{- .Os }}_
       {{- .Arch }}
-  # Stable-named archive: autoclaude_linux_amd64.tar.gz (version-less)
+  # Stable-named archive: tmux-claude-refresh_linux_amd64.tar.gz (version-less)
   # Enables a permanent /releases/latest/download/ URL that always points
   # to the newest build, so the install command never needs updating.
   - id: stable

@@ -1,23 +1,23 @@
-# autoclaude
+# tmux-claude-refresh
+
+![tmux-claude-refresh](tmux-claude-refresh.png)
 
 A TUI that watches tmux panes running [Claude Code](https://claude.com/claude-code) and automatically sends "continue" when a rate limit resets.
-
-Fork of [henryaj/autoclaude](https://github.com/henryaj/autoclaude), updated to detect Claude Code's newer rate-limit messages (`You've hit your session limit`, `You've hit your weekly limit`, `You're out of extra usage`).
 
 ## Install
 
 Latest release:
 
 ```bash
-curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/latest/download/autoclaude_linux_amd64.tar.gz \
-  | sudo tar -xz -C /usr/local/bin autoclaude
+curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/latest/download/tmux-claude-refresh_linux_amd64.tar.gz \
+  | sudo tar -xz -C /usr/local/bin tmux-claude-refresh
 ```
 
-Pinned to a specific version (e.g. v0.1.4):
+Pinned to a specific version (e.g. v0.1.5):
 
 ```bash
-curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/download/v0.1.4/autoclaude_0.1.4_linux_amd64.tar.gz \
-  | sudo tar -xz -C /usr/local/bin autoclaude
+curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/download/v0.1.5/tmux-claude-refresh_0.1.5_linux_amd64.tar.gz \
+  | sudo tar -xz -C /usr/local/bin tmux-claude-refresh
 ```
 
 See all binaries (macOS, Linux, arm64) on the [Releases](https://github.com/robinpecha/tmux-claude-refresh/releases) page.
@@ -25,12 +25,12 @@ See all binaries (macOS, Linux, arm64) on the [Releases](https://github.com/robi
 Requires `tmux`. Run it inside a tmux session:
 
 ```bash
-autoclaude
+tmux-claude-refresh
 ```
 
 ## Usage
 
-1. Start `autoclaude` in a tmux pane.
+1. Start `tmux-claude-refresh` in a tmux pane.
 2. Move to a Claude Code pane with the arrow keys.
 3. Press `tab` to enable auto-continue for that pane.
 4. Leave it running — it sends `continue` when the rate limit resets.

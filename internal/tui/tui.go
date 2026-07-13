@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/henryaj/autoclaude/internal/detection"
-	"github.com/henryaj/autoclaude/internal/tmux"
+	"github.com/robinpecha/tmux-claude-refresh/internal/detection"
+	"github.com/robinpecha/tmux-claude-refresh/internal/tmux"
 )
 
 const pollInterval = 3 * time.Second
@@ -69,7 +69,7 @@ type Model struct {
 	height           int
 	layout           *tmux.Layout
 	selectedPaneID   string
-	ownPaneID        string    // The pane running autoclaude (excluded from detection)
+	ownPaneID        string    // The pane running tmux-claude-refresh (excluded from detection)
 	ownWindowID      string    // The window to monitor (pinned at startup)
 	err              error
 	errTime          time.Time // When the error occurred (for auto-clear)
@@ -396,7 +396,7 @@ func (m Model) View() string {
 	}
 
 	// Header with title and version
-	title := titleStyle.Render("autoclaude")
+	title := titleStyle.Render("tmux-claude-refresh")
 	version := versionStyle.Render(fmt.Sprintf("v%s", m.version))
 	headerWidth := m.width - 4
 	if headerWidth < 20 {
@@ -490,7 +490,7 @@ func (m Model) renderHelp() string {
 		Padding(1, 2).
 		Width(m.width - 4)
 
-	titleLine := titleStyle.Render("autoclaude") + " " + versionStyle.Render(fmt.Sprintf("v%s", m.version))
+	titleLine := titleStyle.Render("tmux-claude-refresh") + " " + versionStyle.Render(fmt.Sprintf("v%s", m.version))
 
 	helpContent := `
 Monitors tmux panes running Claude Code and automatically
@@ -517,7 +517,7 @@ sends "continue" when rate limits reset.
 
   When a Claude Code pane shows a rate limit message like
   "limit reached ∙ resets Xpm" or "You've hit your limit",
-  autoclaude waits for that time to pass, then sends:
+  tmux-claude-refresh waits for that time to pass, then sends:
   Escape → "continue" → Enter
 
   Polling occurs every 3 seconds.
