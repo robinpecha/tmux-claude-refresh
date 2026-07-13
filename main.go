@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/robinpecha/tmux-claude-refresh/internal/config"
 	"github.com/robinpecha/tmux-claude-refresh/internal/tmux"
 	"github.com/robinpecha/tmux-claude-refresh/internal/tui"
 )
@@ -24,8 +25,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	cfg := config.Load()
+
 	p := tea.NewProgram(
-		tui.New(version, *testPattern),
+		tui.New(version, *testPattern, cfg.DisplayLocation),
 		tea.WithAltScreen(),
 	)
 

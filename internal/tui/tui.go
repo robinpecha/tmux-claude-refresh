@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/robinpecha/tmux-claude-refresh/internal/config"
 	"github.com/robinpecha/tmux-claude-refresh/internal/detection"
 	"github.com/robinpecha/tmux-claude-refresh/internal/tmux"
 )
@@ -77,14 +78,23 @@ type Model struct {
 	lastContinueSent time.Time // When we last sent a continue command
 	lastContinuePane string    // Which pane we sent it to
 	showHelp         bool      // Whether to show the help overlay
+	displayLoc       *time.Location // Timezone for rendering reset times
+	showTZPicker     bool      // Whether to show the timezone picker overlay
+	tzFilter         string    // Typed filter in the timezone picker
+	tzIndex          int       // Selected row in the filtered timezone list
+	tzError          string    // Error shown in the picker (e.g. save failed)
 }
 
-func New(version string, testPattern string) Model {
+func New(version string, testPattern string, displayLoc *time.Location) Model {
+	if displayLoc == nil {
+		displayLoc = time.Local
+	}
 	return Model{
 		version:     version,
 		testPattern: testPattern,
 		width:       80,
 		height:      24,
+		displayLoc:   displayLoc,
 	}
 }
 
@@ -127,6 +137,10 @@ func fetchLayoutCmd(windowID string) tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// If the timezone picker is shown, route keys to it.
+		if m.showTZPicker {
+			return m.handleTZPickerKey(msg)
+		}
 		// If help is shown, any key dismisses it
 		if m.showHelp {
 			m.showHelp = false
@@ -138,6 +152,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "h", "?":
 			m.showHelp = true
+		case "t":
+			m.showTZPicker = true
+			m.tzFilter = ""
+			m.tzIndex = 0
+			m.tzError = ""
 		case "left":
 			m.moveSelection(tmux.DirLeft)
 		case "right":
@@ -193,6 +212,72 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleTZPickerKey processes keys while the timezone picker overlay is open.
+func (m Model) handleTZPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.showTZPicker = false
+		m.tzError = ""
+		return m, nil
+	case "ctrl+c":
+		return m, tea.Quit
+	case "enter":
+		matches := filteredTimezones(m.tzFilter)
+		if len(matches) == 0 {
+			return m, nil
+		}
+		idx := m.tzIndex
+		if idx < 0 || idx >= len(matches) {
+			idx = 0
+		}
+		name := matches[idx]
+		loc, err := time.LoadLocation(name)
+		if err != nil {
+			m.tzError = "invalid timezone: " + err.Error()
+			return m, nil
+		}
+		if err := config.SaveTimezone(name); err != nil {
+			m.tzError = "could not save config: " + err.Error()
+			return m, nil
+		}
+		m.displayLoc = loc
+		m.showTZPicker = false
+		m.tzError = ""
+		// Re-poll so displayed reset times refresh in the new timezone.
+		m.pollPanes()
+		return m, nil
+	case "up":
+		if m.tzIndex > 0 {
+			m.tzIndex--
+		}
+		return m, nil
+	case "down":
+		matches := filteredTimezones(m.tzFilter)
+		if m.tzIndex < len(matches)-1 {
+			m.tzIndex++
+		}
+		return m, nil
+	case "backspace":
+		if m.tzFilter != "" {
+			m.tzFilter = m.tzFilter[:len(m.tzFilter)-1]
+		}
+		m.tzIndex = 0
+		m.tzError = ""
+		return m, nil
+	}
+
+	// Printable characters extend the filter.
+	if s := msg.String(); len(s) == 1 {
+		r := s[0]
+		if r >= 0x20 && r != 0x7f {
+			m.tzFilter += s
+			m.tzIndex = 0
+			m.tzError = ""
+		}
+	}
+	return m, nil
+}
+
 func (m *Model) pollPanes() {
 	if m.layout == nil {
 		return
@@ -214,7 +299,7 @@ func (m *Model) pollPanes() {
 
 		// Check rate limit status for Claude Code panes
 		if pane.HasClaudeCode {
-			status := detection.CheckRateLimit(content)
+			status := detection.CheckRateLimit(content, m.displayLoc)
 
 			// Track rate limit state
 			wasLimited := pane.IsRateLimited
@@ -359,7 +444,7 @@ func (m *Model) checkPaneRateLimit(pane *tmux.Pane) {
 		return
 	}
 
-	status := detection.CheckRateLimit(content)
+	status := detection.CheckRateLimit(content, m.displayLoc)
 	pane.IsRateLimited = status.IsLimited
 	pane.RateLimitResets = status.ResetsAt
 	pane.RateLimitTime = status.ResetTime
@@ -390,6 +475,10 @@ func (m *Model) disableAll() {
 }
 
 func (m Model) View() string {
+	// Show timezone picker overlay if active
+	if m.showTZPicker {
+		return m.renderTZPicker()
+	}
 	// Show help overlay if active
 	if m.showHelp {
 		return m.renderHelp()
@@ -469,7 +558,7 @@ func (m Model) View() string {
 		}
 	}
 
-	helpText := dimTextStyle.Render("←↑↓→ nav • tab toggle • a on • n off • r refresh • h help • q quit")
+	helpText := dimTextStyle.Render("←↑↓→ nav • tab toggle • a on • n off • r refresh • t timezone • h help • q quit")
 
 	// Footer: status on first line, help on second line (both left-aligned)
 	var footer string
@@ -503,6 +592,7 @@ sends "continue" when rate limits reset.
   a         Enable auto-continue for all Claude Code panes
   n         Disable auto-continue for all Claude Code panes
   r         Refresh pane layout
+  t         Choose display timezone
   h / ?     Show this help
   q         Quit
 

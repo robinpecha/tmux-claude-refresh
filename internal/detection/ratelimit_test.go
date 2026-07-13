@@ -3,6 +3,7 @@ package detection
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -18,13 +19,16 @@ func loadFixture(t *testing.T, name string) string {
 
 func TestCheckRateLimit_NewFormat(t *testing.T) {
 	content := loadFixture(t, "rate_limit_new_format.txt")
-	status := CheckRateLimit(content)
+	// Fixture contains "(Europe/London)"; display in that same zone so the
+	// rendered time is a deterministic no-op regardless of DST.
+	london, _ := time.LoadLocation("Europe/London")
+	status := CheckRateLimit(content, london)
 
 	if !status.IsLimited {
 		t.Error("expected IsLimited to be true")
 	}
-	if status.ResetsAt != "10pm" {
-		t.Errorf("expected ResetsAt to be '10pm', got '%s'", status.ResetsAt)
+	if status.ResetsAt != "10pm (Europe/London)" {
+		t.Errorf("expected ResetsAt to be '10pm (Europe/London)', got '%s'", status.ResetsAt)
 	}
 	if status.ResetTime.IsZero() {
 		t.Error("expected ResetTime to be set")
@@ -33,13 +37,13 @@ func TestCheckRateLimit_NewFormat(t *testing.T) {
 
 func TestCheckRateLimit_OldFormat(t *testing.T) {
 	content := loadFixture(t, "rate_limit_old_format.txt")
-	status := CheckRateLimit(content)
+	status := CheckRateLimit(content, time.Local)
 
 	if !status.IsLimited {
 		t.Error("expected IsLimited to be true")
 	}
-	if status.ResetsAt != "2pm" {
-		t.Errorf("expected ResetsAt to be '2pm', got '%s'", status.ResetsAt)
+	if status.ResetsAt != "2pm (Local)" {
+		t.Errorf("expected ResetsAt to be '2pm (Local)', got '%s'", status.ResetsAt)
 	}
 	if status.ResetTime.IsZero() {
 		t.Error("expected ResetTime to be set")
@@ -48,7 +52,7 @@ func TestCheckRateLimit_OldFormat(t *testing.T) {
 
 func TestCheckRateLimit_NoMatch(t *testing.T) {
 	content := loadFixture(t, "not_claude_code.txt")
-	status := CheckRateLimit(content)
+	status := CheckRateLimit(content, time.Local)
 
 	if status.IsLimited {
 		t.Error("expected IsLimited to be false")
@@ -56,50 +60,57 @@ func TestCheckRateLimit_NoMatch(t *testing.T) {
 }
 
 func TestCheckRateLimit_TimeFormats(t *testing.T) {
+	london, _ := time.LoadLocation("Europe/London")
+	dublin, _ := time.LoadLocation("Europe/Dublin")
+
 	cases := []struct {
-		name     string
-		content  string
-		wantTime string
+		name       string
+		content    string
+		wantTime   string
+		displayLoc *time.Location // nil -> time.Local
 	}{
 		{
 			name:     "simple pm",
 			content:  "You've hit your limit · resets 2pm",
-			wantTime: "2pm",
+			wantTime: "2pm (Local)",
 		},
 		{
 			name:     "simple am",
 			content:  "You've hit your limit · resets 9am",
-			wantTime: "9am",
+			wantTime: "9am (Local)",
 		},
 		{
 			name:     "with minutes",
 			content:  "limit reached ∙ resets 10:30am",
-			wantTime: "10:30am",
+			wantTime: "10:30am (Local)",
 		},
 		{
 			name:     "with space before am/pm",
 			content:  "limit reached ∙ resets 3 pm",
-			wantTime: "3 pm",
+			wantTime: "3pm (Local)",
 		},
 		{
-			name:     "double digit hour",
-			content:  "You've hit your limit · resets 11pm (Europe/London)",
-			wantTime: "11pm",
+			name:       "double digit hour",
+			content:    "You've hit your limit · resets 11pm (Europe/London)",
+			wantTime:   "11pm (Europe/London)",
+			displayLoc: london,
 		},
 		{
-			name:     "session limit with clock time",
-			content:  "You've hit your session limit · resets 2:20pm (Europe/Dublin)",
-			wantTime: "2:20pm",
+			name:       "session limit with clock time",
+			content:    "You've hit your session limit · resets 2:20pm (Europe/Dublin)",
+			wantTime:   "2:20pm (Europe/Dublin)",
+			displayLoc: dublin,
 		},
 		{
 			name:     "weekly limit",
 			content:  "You've hit your weekly limit · resets 9am",
-			wantTime: "9am",
+			wantTime: "9am (Local)",
 		},
 		{
-			name:     "extra usage",
-			content:  "You're out of extra usage · resets 8pm (Europe/London)",
-			wantTime: "8pm",
+			name:       "extra usage",
+			content:    "You're out of extra usage · resets 8pm (Europe/London)",
+			wantTime:   "8pm (Europe/London)",
+			displayLoc: london,
 		},
 		{
 			name:     "session limit minutes format",
@@ -130,7 +141,11 @@ func TestCheckRateLimit_TimeFormats(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			status := CheckRateLimit(tc.content)
+			loc := tc.displayLoc
+			if loc == nil {
+				loc = time.Local
+			}
+			status := CheckRateLimit(tc.content, loc)
 			if !status.IsLimited {
 				t.Error("expected IsLimited to be true")
 			}
@@ -142,7 +157,7 @@ func TestCheckRateLimit_TimeFormats(t *testing.T) {
 }
 
 func TestCheckRateLimit_MinutesFormat(t *testing.T) {
-	status := CheckRateLimit("⚠ Limit reached (resets 30m)")
+	status := CheckRateLimit("⚠ Limit reached (resets 30m)", time.Local)
 
 	if !status.IsLimited {
 		t.Error("expected IsLimited to be true")
@@ -201,7 +216,7 @@ func TestCheckRateLimit_FallbackNoTime(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			status := CheckRateLimit(tc.content)
+			status := CheckRateLimit(tc.content, time.Local)
 			if !status.IsLimited {
 				t.Error("expected IsLimited to be true")
 			}
@@ -224,7 +239,7 @@ func TestCheckRateLimit_NoMatchCases(t *testing.T) {
 
 	for _, content := range cases {
 		t.Run(content, func(t *testing.T) {
-			status := CheckRateLimit(content)
+			status := CheckRateLimit(content, time.Local)
 			if status.IsLimited {
 				t.Errorf("expected IsLimited to be false for: %q", content)
 			}
@@ -275,5 +290,49 @@ func TestHasReset(t *testing.T) {
 				t.Errorf("HasReset() = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestCheckRateLimit_TimezoneConversion exercises parsing the source timezone
+// Claude embeds in "(...)" and converting the reset instant into a different
+// display timezone. Uses time.FixedZone for fully deterministic offsets (no
+// reliance on the host's zone or DST).
+func TestCheckRateLimit_TimezoneConversion(t *testing.T) {
+	// Source is UTC (10pm UTC). Display is a fixed UTC+3 zone.
+	// 10pm UTC -> 1am the following day in UTC+3.
+	utcPlus3 := time.FixedZone("Display+03", 3*60*60)
+	status := CheckRateLimit("You've hit your limit · resets 10pm (UTC)", utcPlus3)
+
+	if !status.IsLimited {
+		t.Fatal("expected IsLimited to be true")
+	}
+	if status.ResetsAt != "1am (Display+03)" {
+		t.Errorf("expected ResetsAt '1am (Display+03)', got '%s'", status.ResetsAt)
+	}
+	// ResetTime is an absolute instant; in UTC it should be 22:00.
+	if rt := status.ResetTime.In(time.UTC); rt.Hour() != 22 || rt.Minute() != 0 {
+		t.Errorf("expected ResetTime 22:00 UTC, got %v", rt)
+	}
+}
+
+// TestCheckRateLimit_NoSourceTimezone confirms that when Claude omits the
+// "(...)" suffix, the source defaults to the host local time (so the reset
+// instant is anchored in Local) and the display reflects the passed location.
+func TestCheckRateLimit_NoSourceTimezone(t *testing.T) {
+	prague, _ := time.LoadLocation("Europe/Prague")
+	status := CheckRateLimit("You've hit your session limit · resets 9am", prague)
+
+	if !status.IsLimited {
+		t.Fatal("expected IsLimited to be true")
+	}
+	// 9am Local displayed in Prague. Since the source defaults to Local, the
+	// rendered time is 9am shifted by (Prague offset - Local offset); the exact
+	// hour depends on the host, but the zone label must be Prague.
+	wantSuffix := "(Europe/Prague)"
+	if !strings.HasSuffix(status.ResetsAt, wantSuffix) {
+		t.Errorf("expected ResetsAt to end with %q, got '%s'", wantSuffix, status.ResetsAt)
+	}
+	if status.ResetTime.IsZero() {
+		t.Error("expected ResetTime to be set")
 	}
 }

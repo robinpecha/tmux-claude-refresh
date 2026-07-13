@@ -13,10 +13,10 @@ curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/latest/downl
   | sudo tar -xz -C /usr/local/bin tmux-claude-refresh
 ```
 
-Pinned to a specific version (e.g. v0.1.5):
+Pinned to a specific version (e.g. v0.2.0):
 
 ```bash
-curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/download/v0.1.5/tmux-claude-refresh_0.1.5_linux_amd64.tar.gz \
+curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/download/v0.2.0/tmux-claude-refresh_0.2.0_linux_amd64.tar.gz \
   | sudo tar -xz -C /usr/local/bin tmux-claude-refresh
 ```
 
@@ -44,6 +44,7 @@ tmux-claude-refresh
 | `a` | Auto-continue all Claude Code panes |
 | `n` | Disable auto-continue on all panes |
 | `r` | Refresh pane layout |
+| `t` | Choose display timezone |
 | `h` / `?` | Help |
 | `q` | Quit |
 
@@ -62,6 +63,24 @@ tmux-claude-refresh
 2. Detects Claude Code by its UI patterns.
 3. Parses the reset time from the rate-limit message.
 4. When the time passes, sends `Escape` → `continue` → `Enter`.
+
+## Timezone
+
+Reset times are displayed in your chosen timezone. Claude embeds its own timezone in the rate-limit message (e.g. `resets 10pm (Europe/London)`); tmux-claude-refresh reads that, converts the instant correctly, and shows it in your timezone — e.g. `resets 11pm (Europe/Prague)`.
+
+Press `t` in the TUI to open a searchable timezone picker. Type to filter, `↑↓` to navigate, `enter` to select. Your choice is saved to:
+
+```
+~/.config/tmux-claude-refresh/config
+```
+
+with a single line:
+
+```
+timezone = Europe/Prague
+```
+
+If the file is absent or the timezone is invalid, it falls back to your system local time.
 
 ## Development
 

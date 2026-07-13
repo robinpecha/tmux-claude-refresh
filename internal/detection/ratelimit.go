@@ -25,13 +25,15 @@ type RateLimitStatus struct {
 //
 // The `(?:\w+\s+)?` allows an optional qualifier word that Claude Code now
 // inserts between "your" and "limit" (e.g. "session", "weekly").
+// The trailing `(?:\s*\(([^)]+)\))?` captures the optional source timezone
+// Claude embeds in parentheses, e.g. "(Europe/London)".
 var rateLimitPatterns = []*regexp.Regexp{
 	// New format: "You've hit your [session|weekly] limit · resets 10pm (Europe/London)"
-	regexp.MustCompile(`(?i)hit\s+your\s+(?:\w+\s+)?limit.*resets?\s+(\d{1,2}(?::\d{2})?\s*[ap]m)`),
+	regexp.MustCompile(`(?i)hit\s+your\s+(?:\w+\s+)?limit.*resets?\s+(\d{1,2}(?::\d{2})?\s*[ap]m)(?:\s*\(([^)]+)\))?`),
 	// New format (extra usage): "You're out of extra usage · resets 8pm (Europe/London)"
-	regexp.MustCompile(`(?i)you're\s+out\s+of\s+extra\s+usage.*resets?\s+(\d{1,2}(?::\d{2})?\s*[ap]m)`),
+	regexp.MustCompile(`(?i)you're\s+out\s+of\s+extra\s+usage.*resets?\s+(\d{1,2}(?::\d{2})?\s*[ap]m)(?:\s*\(([^)]+)\))?`),
 	// Original format: "limit reached ∙ resets 2pm"
-	regexp.MustCompile(`(?i)limit\s+reached.*resets?\s+(\d{1,2}(?::\d{2})?\s*[ap]m)`),
+	regexp.MustCompile(`(?i)limit\s+reached.*resets?\s+(\d{1,2}(?::\d{2})?\s*[ap]m)(?:\s*\(([^)]+)\))?`),
 	// Minutes remaining format: "Limit reached (resets 8m)" or "resets 45m"
 	regexp.MustCompile(`(?i)(?:hit\s+your\s+(?:\w+\s+)?limit|you're\s+out\s+of\s+extra\s+usage|limit\s+reached).*resets?\s+(\d{1,3})m\b`),
 }
@@ -51,8 +53,14 @@ var rateLimitFallbackPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\brate\s+limited\b`),
 }
 
-// CheckRateLimit checks pane content for rate limit messages
-func CheckRateLimit(content string) RateLimitStatus {
+// CheckRateLimit checks pane content for rate limit messages. displayLoc is
+// the timezone used to render the reset time for the user; the underlying
+// ResetTime instant is computed in the timezone Claude embedded in the
+// message (falling back to the host's local time when Claude omits one).
+func CheckRateLimit(content string, displayLoc *time.Location) RateLimitStatus {
+	if displayLoc == nil {
+		displayLoc = time.Local
+	}
 	// Try patterns that capture reset time first
 	var match []string
 	var patternIdx int
@@ -78,11 +86,11 @@ func CheckRateLimit(content string) RateLimitStatus {
 		return RateLimitStatus{IsLimited: false}
 	}
 
-	resetStr := match[1]
 	now := time.Now()
 
 	// The last pattern is the minutes-remaining format (e.g., "8m" -> "8")
 	if patternIdx == len(rateLimitPatterns)-1 {
+		resetStr := match[1]
 		minutes, err := strconv.Atoi(resetStr)
 		if err != nil {
 			return RateLimitStatus{
@@ -100,7 +108,16 @@ func CheckRateLimit(content string) RateLimitStatus {
 	}
 
 	// Clock time format (e.g., "8pm", "10:30am")
-	resetTime, err := parseResetTime(resetStr)
+	resetStr := match[1]
+	// Optional source timezone (group 2); empty when Claude omits "(...)".
+	sourceLoc := time.Local
+	if len(match) >= 3 && match[2] != "" {
+		if loc, err := time.LoadLocation(match[2]); err == nil {
+			sourceLoc = loc
+		}
+	}
+
+	resetTime, err := parseResetTime(resetStr, sourceLoc, now)
 	if err != nil {
 		// Pattern matched but couldn't parse time - still rate limited
 		return RateLimitStatus{
@@ -121,18 +138,35 @@ func CheckRateLimit(content string) RateLimitStatus {
 
 	return RateLimitStatus{
 		IsLimited: true,
-		ResetsAt:  resetStr,
+		ResetsAt:  formatResetDisplay(resetTime, displayLoc),
 		ResetTime: resetTime,
 		TimeUntil: timeUntil,
 	}
 }
 
-// parseResetTime parses a time string like "2pm" or "10:30am" into a time.Time for today
-func parseResetTime(s string) (time.Time, error) {
-	s = strings.ToLower(strings.TrimSpace(s))
+// formatResetDisplay renders the reset instant in the user's display timezone
+// as e.g. "11pm (Europe/Prague)", omitting minutes when zero to match Claude's
+// natural style.
+func formatResetDisplay(t time.Time, displayLoc *time.Location) string {
+	tt := t.In(displayLoc)
+	var s string
+	if tt.Minute() == 0 {
+		s = tt.Format("3pm")
+	} else {
+		s = tt.Format("3:04pm")
+	}
+	return s + " (" + displayLoc.String() + ")"
+}
 
-	now := time.Now()
-	loc := now.Location()
+// parseResetTime parses a clock time string like "2pm" or "10:30am" into a
+// time.Time for the current date in loc, anchored against now (the date
+// components are taken from now in loc so midnight-boundary cases are handled).
+func parseResetTime(s string, loc *time.Location, now time.Time) (time.Time, error) {
+	if loc == nil {
+		loc = time.Local
+	}
+	s = strings.ToLower(strings.TrimSpace(s))
+	nowIn := now.In(loc)
 
 	// Try parsing with minutes first: "10:30am"
 	formats := []string{
@@ -145,8 +179,8 @@ func parseResetTime(s string) (time.Time, error) {
 	for _, format := range formats {
 		t, err := time.ParseInLocation(format, s, loc)
 		if err == nil {
-			// Combine parsed time with today's date
-			return time.Date(now.Year(), now.Month(), now.Day(),
+			// Combine parsed time with today's date (in loc)
+			return time.Date(nowIn.Year(), nowIn.Month(), nowIn.Day(),
 				t.Hour(), t.Minute(), 0, 0, loc), nil
 		}
 	}
@@ -174,7 +208,7 @@ func parseResetTime(s string) (time.Time, error) {
 		hour = 0
 	}
 
-	return time.Date(now.Year(), now.Month(), now.Day(),
+	return time.Date(nowIn.Year(), nowIn.Month(), nowIn.Day(),
 		hour, minute, 0, 0, loc), nil
 }
 
