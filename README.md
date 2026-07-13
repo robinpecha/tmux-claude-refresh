@@ -1,106 +1,64 @@
 # autoclaude
 
-A TUI app that monitors tmux panes running [Claude Code](https://claude.com/claude-code) and automatically sends "continue" when rate limits reset.
+A TUI that watches tmux panes running [Claude Code](https://claude.com/claude-code) and automatically sends "continue" when a rate limit resets.
 
-![CI](https://github.com/henryaj/autoclaude/actions/workflows/ci.yml/badge.svg)
+Fork of [henryaj/autoclaude](https://github.com/henryaj/autoclaude), updated to detect Claude Code's newer rate-limit messages (`You've hit your session limit`, `You've hit your weekly limit`, `You're out of extra usage`).
 
-## The Problem
-
-When using Claude Code heavily, you'll hit rate limits. Claude shows a message like:
-
-```
-limit reached ∙ resets 2pm
-```
-
-You then have to wait and manually type "continue" when the limit resets. If you're running multiple Claude Code sessions, this becomes tedious.
-
-## The Solution
-
-**autoclaude** monitors your tmux panes and automatically sends "continue" when the rate limit resets. Just enable auto-continue on the panes you want to monitor, and autoclaude handles the rest.
-
-## Installation
-
-### Homebrew (macOS/Linux)
+## Install
 
 ```bash
-brew install henryaj/tap/autoclaude
+curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/download/v0.1.3/autoclaude_0.1.3_linux_amd64.tar.gz \
+  | sudo tar -xz -C /usr/local/bin autoclaude
 ```
 
-### From source
-
-```bash
-go install github.com/henryaj/autoclaude@latest
-```
-
-### Download binary
-
-Download from [Releases](https://github.com/henryaj/autoclaude/releases).
-
-## Usage
-
-1. Start autoclaude in a tmux pane (it must run inside tmux):
+Requires `tmux`. Run it inside a tmux session:
 
 ```bash
 autoclaude
 ```
 
-2. Use arrow keys to navigate to a Claude Code pane
-3. Press `tab` to enable auto-continue for that pane
-4. Leave autoclaude running - it will send "continue" when rate limits reset
+## Usage
 
-### Keybindings
+1. Start `autoclaude` in a tmux pane.
+2. Move to a Claude Code pane with the arrow keys.
+3. Press `tab` to enable auto-continue for that pane.
+4. Leave it running — it sends `continue` when the rate limit resets.
+
+### Keys
 
 | Key | Action |
 |-----|--------|
-| `←↑↓→` | Navigate between panes |
-| `tab` | Toggle auto-continue for selected pane |
-| `a` | Enable auto-continue for all Claude Code panes |
-| `n` | Disable auto-continue for all Claude Code panes |
+| `←↑↓→` | Navigate panes |
+| `tab` | Toggle auto-continue |
+| `a` | Auto-continue all Claude Code panes |
+| `n` | Disable auto-continue on all panes |
 | `r` | Refresh pane layout |
-| `h` / `?` | Show help |
+| `h` / `?` | Help |
 | `q` | Quit |
 
-### Pane Colors
+### Pane colors
 
 | Color | Meaning |
 |-------|---------|
-| Orange | Claude Code pane (auto-continue off) |
-| Green | Claude Code pane (auto-continue on) |
-| Red | Rate limited (waiting for reset time) |
+| Orange | Claude Code (auto-continue off) |
+| Green | Claude Code (auto-continue on) |
+| Red | Rate limited (waiting for reset) |
 | Cyan | Selected pane |
 
-## How It Works
+## How it works
 
-1. autoclaude polls tmux panes every 3 seconds
-2. It detects Claude Code by looking for characteristic UI patterns
-3. When it finds "limit reached ∙ resets Xpm", it parses the reset time
-4. When the reset time passes, it sends: `Escape` → `continue` → `Enter`
-5. The pane resumes automatically
-
-## Requirements
-
-- tmux (autoclaude must run inside a tmux session)
-- Go 1.21+ (if building from source)
+1. Polls tmux panes every 3 seconds.
+2. Detects Claude Code by its UI patterns.
+3. Parses the reset time from the rate-limit message.
+4. When the time passes, sends `Escape` → `continue` → `Enter`.
 
 ## Development
 
 ```bash
-# Run tests
 go test ./...
-
-# Build
 go build
-
-# Run with test pattern (for debugging without hitting rate limits)
-./autoclaude --test-pattern "<<<TEST>>>"
 ```
 
 ## License
 
-MIT License - see [LICENSE](LICENSE)
-
-## Credits
-
-Made by [Henry Stanley](https://henrystanley.com)
-
-Built with [Claude Code](https://claude.com/claude-code)
+MIT — see [LICENSE](LICENSE). Original work by [Henry Stanley](https://henrystanley.com).
