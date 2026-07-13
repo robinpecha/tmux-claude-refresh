@@ -19,10 +19,21 @@ builds:
       - -s -w -X main.version={{.Version}}
 
 archives:
-  - format: tar.gz
+  # Versioned archive: autoclaude_0.1.4_linux_amd64.tar.gz (for pinning)
+  - id: versioned
+    format: tar.gz
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+  # Stable-named archive: autoclaude_linux_amd64.tar.gz (version-less)
+  # Enables a permanent /releases/latest/download/ URL that always points
+  # to the newest build, so the install command never needs updating.
+  - id: stable
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
       {{- .Os }}_
       {{- .Arch }}
 

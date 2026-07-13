@@ -6,10 +6,21 @@ Fork of [henryaj/autoclaude](https://github.com/henryaj/autoclaude), updated to 
 
 ## Install
 
+Latest release:
+
 ```bash
-curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/download/v0.1.3/autoclaude_0.1.3_linux_amd64.tar.gz \
+curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/latest/download/autoclaude_linux_amd64.tar.gz \
   | sudo tar -xz -C /usr/local/bin autoclaude
 ```
+
+Pinned to a specific version (e.g. v0.1.4):
+
+```bash
+curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/download/v0.1.4/autoclaude_0.1.4_linux_amd64.tar.gz \
+  | sudo tar -xz -C /usr/local/bin autoclaude
+```
+
+See all binaries (macOS, Linux, arm64) on the [Releases](https://github.com/robinpecha/tmux-claude-refresh/releases) page.
 
 Requires `tmux`. Run it inside a tmux session:
 
