@@ -14,6 +14,9 @@ type Config struct {
 	// DisplayLocation is the timezone used to render rate-limit reset times
 	// in the TUI. Defaults to time.Local when unset or invalid.
 	DisplayLocation *time.Location
+	// BellEnabled controls whether a terminal bell (\a) is emitted when
+	// auto-continue sends the "continue" command. Defaults to false.
+	BellEnabled bool
 }
 
 // Path returns the config file path, honoring $XDG_CONFIG_HOME.
@@ -59,6 +62,8 @@ func Load() Config {
 				continue
 			}
 			cfg.DisplayLocation = loc
+		case "bell":
+			cfg.BellEnabled = val == "on" || val == "true" || val == "yes" || val == "1"
 		}
 	}
 	return cfg
@@ -83,6 +88,38 @@ func SaveTimezone(name string) error {
 	}
 	if !wrote {
 		out = append(out, "timezone = "+name)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(strings.Join(out, "\n")+"\n"), 0o644)
+}
+
+// SaveBell writes `bell = on|off` to the config file, creating the
+// parent directory if needed. Existing keys are preserved; a `bell` key,
+// if present, is replaced in place.
+func SaveBell(enabled bool) error {
+	path := Path()
+	existing := readExisting(path)
+
+	val := "off"
+	if enabled {
+		val = "on"
+	}
+
+	out := make([]string, 0, len(existing)+1)
+	wrote := false
+	for _, line := range existing {
+		if key, _, ok := splitKV(line); ok && key == "bell" {
+			out = append(out, "bell = "+val)
+			wrote = true
+			continue
+		}
+		out = append(out, line)
+	}
+	if !wrote {
+		out = append(out, "bell = "+val)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

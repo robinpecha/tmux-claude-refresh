@@ -42,7 +42,7 @@ func TestFilteredTimezones_NoMatch(t *testing.T) {
 }
 
 func TestRenderTZPicker_NoPanic(t *testing.T) {
-	m := New("test", "", nil)
+	m := New("test", "", nil, false)
 	m.width = 80
 	m.height = 24
 	m.showTZPicker = true
@@ -62,7 +62,7 @@ func TestRenderTZPicker_NoPanic(t *testing.T) {
 }
 
 func TestRenderTZPicker_NoMatches(t *testing.T) {
-	m := New("test", "", nil)
+	m := New("test", "", nil, false)
 	m.width = 80
 	m.height = 24
 	m.showTZPicker = true

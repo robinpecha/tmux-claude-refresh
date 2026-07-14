@@ -13,9 +13,9 @@ const (
 func (m PaneMode) String() string {
 	switch m {
 	case ModeContinueOnRateLimit:
-		return "auto"
+		return "Auto continue enabled"
 	default:
-		return "off"
+		return "Not watching"
 	}
 }
 

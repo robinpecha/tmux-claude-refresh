@@ -4,7 +4,7 @@
 
 A TUI that watches tmux panes running [Claude Code](https://claude.com/claude-code) and automatically sends "continue" when a rate limit resets.
 
-## Install
+## Install / update
 
 Latest release:
 
@@ -13,14 +13,13 @@ curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/latest/downl
   | sudo tar -xz -C /usr/local/bin tmux-claude-refresh
 ```
 
-Pinned to a specific version (e.g. v0.2.0):
+See all binaries (macOS, Linux, arm64) on the [Releases](https://github.com/robinpecha/tmux-claude-refresh/releases) page.
+
+To print the exact update command for your current install location:
 
 ```bash
-curl -sL https://github.com/robinpecha/tmux-claude-refresh/releases/download/v0.2.0/tmux-claude-refresh_0.2.0_linux_amd64.tar.gz \
-  | sudo tar -xz -C /usr/local/bin tmux-claude-refresh
+tmux-claude-refresh --update
 ```
-
-See all binaries (macOS, Linux, arm64) on the [Releases](https://github.com/robinpecha/tmux-claude-refresh/releases) page.
 
 Requires `tmux`. Run it inside a tmux session:
 
@@ -45,6 +44,7 @@ tmux-claude-refresh
 | `n` | Disable auto-continue on all panes |
 | `r` | Refresh pane layout |
 | `t` | Choose display timezone |
+| `b` | Toggle terminal bell on auto-continue |
 | `h` / `?` | Help |
 | `q` | Quit |
 
@@ -82,13 +82,19 @@ timezone = Europe/Prague
 
 If the file is absent or the timezone is invalid, it falls back to your system local time.
 
-## Development
+### Terminal bell
 
-```bash
-go test ./...
-go build
+Press `b` in the TUI to toggle a terminal bell (`\a`) that rings each time auto-continue sends the `continue` command. The setting is saved to the same config file:
+
+```
+bell = on
 ```
 
-## License
+Defaults to off.
 
-MIT — see [LICENSE](LICENSE). Original work by [Henry Stanley](https://henrystanley.com).
+## Uninstall
+
+```bash
+sudo rm -f /usr/local/bin/tmux-claude-refresh
+rm -rf ~/.config/tmux-claude-refresh
+```

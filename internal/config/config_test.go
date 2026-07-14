@@ -69,3 +69,53 @@ func TestLoad_InvalidTimezoneFallsBack(t *testing.T) {
 		t.Errorf("expected fallback to time.Local, got %v", cfg.DisplayLocation)
 	}
 }
+
+func TestSaveAndLoadBellRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+
+	if err := SaveBell(true); err != nil {
+		t.Fatalf("SaveBell(true): %v", err)
+	}
+	cfg := Load()
+	if !cfg.BellEnabled {
+		t.Errorf("expected BellEnabled=true, got false")
+	}
+
+	if err := SaveBell(false); err != nil {
+		t.Fatalf("SaveBell(false): %v", err)
+	}
+	cfg = Load()
+	if cfg.BellEnabled {
+		t.Errorf("expected BellEnabled=false, got true")
+	}
+}
+
+func TestSaveBell_PreservesOtherKeys(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+
+	if err := SaveTimezone("Europe/Prague"); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveBell(true); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Load()
+	want, _ := time.LoadLocation("Europe/Prague")
+	if cfg.DisplayLocation.String() != want.String() {
+		t.Errorf("timezone should be preserved, got %s", cfg.DisplayLocation)
+	}
+	if !cfg.BellEnabled {
+		t.Errorf("bell should be enabled")
+	}
+}
+
+func TestLoad_BellDefaultsFalse(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg := Load()
+	if cfg.BellEnabled {
+		t.Errorf("expected BellEnabled=false by default, got true")
+	}
+}

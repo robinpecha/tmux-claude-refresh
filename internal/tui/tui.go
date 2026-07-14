@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -83,9 +84,10 @@ type Model struct {
 	tzFilter         string    // Typed filter in the timezone picker
 	tzIndex          int       // Selected row in the filtered timezone list
 	tzError          string    // Error shown in the picker (e.g. save failed)
+	bellEnabled      bool      // Whether to ring the terminal bell on auto-continue
 }
 
-func New(version string, testPattern string, displayLoc *time.Location) Model {
+func New(version string, testPattern string, displayLoc *time.Location, bellEnabled bool) Model {
 	if displayLoc == nil {
 		displayLoc = time.Local
 	}
@@ -95,6 +97,7 @@ func New(version string, testPattern string, displayLoc *time.Location) Model {
 		width:       80,
 		height:      24,
 		displayLoc:   displayLoc,
+		bellEnabled:  bellEnabled,
 	}
 }
 
@@ -174,6 +177,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			m.pollPanes()
 			return m, fetchLayoutCmd(m.ownWindowID)
+		case "b":
+			m.bellEnabled = !m.bellEnabled
+			_ = config.SaveBell(m.bellEnabled)
 		}
 
 	case tea.WindowSizeMsg:
@@ -359,9 +365,26 @@ func (m *Model) sendContinue(paneID string) {
 	_ = tmux.SendKeys(paneID, "continue")
 	_ = tmux.SendKeys(paneID, "Enter")
 
+	// Ring the terminal bell if enabled
+	if m.bellEnabled {
+		ringBell()
+	}
+
 	// Track for UI feedback
 	m.lastContinueSent = time.Now()
 	m.lastContinuePane = paneID
+}
+
+// ringBell writes the bell character (\a) to /dev/tty so the terminal
+// emulator plays the bell sound. This works inside tmux because /dev/tty
+// is the pane's controlling terminal.
+func ringBell() {
+	f, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	f.Write([]byte{0x07})
 }
 
 func (m *Model) updateLayout(layout *tmux.Layout) {
@@ -552,13 +575,13 @@ func (m Model) View() string {
 						}
 					}
 				} else {
-					statusText = dimTextStyle.Render("○ Auto-continue disabled")
+					statusText = dimTextStyle.Render("○ Not watching")
 				}
 			}
 		}
 	}
 
-	helpText := dimTextStyle.Render("←↑↓→ nav • tab toggle • a on • n off • r refresh • t timezone • h help • q quit")
+	helpText := dimTextStyle.Render("←↑↓→ nav • tab toggle • a on • n off • r refresh • t timezone • b bell • h help • q quit")
 
 	// Footer: status on first line, help on second line (both left-aligned)
 	var footer string
@@ -593,6 +616,7 @@ sends "continue" when rate limits reset.
   n         Disable auto-continue for all Claude Code panes
   r         Refresh pane layout
   t         Choose display timezone
+  b         Toggle terminal bell on auto-continue
   h / ?     Show this help
   q         Quit
 
