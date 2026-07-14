@@ -180,6 +180,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "b":
 			m.bellEnabled = !m.bellEnabled
 			_ = config.SaveBell(m.bellEnabled)
+			if m.bellEnabled {
+				ringBell()
+			}
 		}
 
 	case tea.WindowSizeMsg:
@@ -507,22 +510,29 @@ func (m Model) View() string {
 		return m.renderHelp()
 	}
 
-	// Header with title and version
+	// Header with title, bell status, and version
 	title := titleStyle.Render("tmux-claude-refresh")
 	version := versionStyle.Render(fmt.Sprintf("v%s", m.version))
+	bellLabel := "bell off"
+	bellColor := mutedGray
+	if m.bellEnabled {
+		bellLabel = "bell on"
+		bellColor = lipgloss.Color("#50fa7b")
+	}
+	bellStatus := lipgloss.NewStyle().Foreground(bellColor).Render(bellLabel)
 	headerWidth := m.width - 4
 	if headerWidth < 20 {
 		headerWidth = 20
 	}
-	// Place title left, version right
+	// Place title left, bell status + version right
 	titleLen := lipgloss.Width(title)
-	versionLen := lipgloss.Width(version)
-	spacerLen := headerWidth - titleLen - versionLen
+	rightLen := lipgloss.Width(bellStatus) + 1 + lipgloss.Width(version)
+	spacerLen := headerWidth - titleLen - rightLen
 	if spacerLen < 1 {
 		spacerLen = 1
 	}
 	spacer := lipgloss.NewStyle().Width(spacerLen).Render("")
-	header := headerStyle.Render(title + spacer + version)
+	header := headerStyle.Render(title + spacer + bellStatus + " " + version)
 
 	// Calculate main pane dimensions
 	mainWidth := m.width - 4
